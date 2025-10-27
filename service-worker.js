@@ -1,5 +1,5 @@
 // This file controls the app's offline functionality and background notifications.
-const CACHE_NAME = 'smart-alarm-v4'; // Incremented version to force update
+const CACHE_NAME = 'smart-alarm-v5'; // Incremented version to force update
 const FILES_TO_CACHE = [
     './', // Caches the index.html
     './index.html',
@@ -49,6 +49,12 @@ self.addEventListener('activate', event => {
 // This strategy ensures users get updates *immediately* if they are online.
 // It falls back to the cache if they are offline.
 self.addEventListener('fetch', event => {
+    // Skip caching for external scripts
+    if (event.request.url.startsWith('http')) {
+        event.respondWith(fetch(event.request));
+        return;
+    }
+
     event.respondWith(
         fetch(event.request)
             .then(networkResponse => {
