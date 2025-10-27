@@ -1,11 +1,10 @@
 // This file controls the app's offline functionality and background notifications.
-const CACHE_NAME = 'smart-alarm-v5'; // Incremented version to force update
+const CACHE_NAME = 'smart-alarm-v6'; // Incremented version to force update
 const FILES_TO_CACHE = [
     './', // Caches the index.html
     './index.html',
-    './manifest.json',
-    'https://cdn.tailwindcss.com',
-    'https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js'
+    './manifest.json'
+    // External resources (Tailwind, Tone.js) will be cached at runtime
 ];
 
 let alarmState = [];
@@ -49,27 +48,29 @@ self.addEventListener('activate', event => {
 // This strategy ensures users get updates *immediately* if they are online.
 // It falls back to the cache if they are offline.
 self.addEventListener('fetch', event => {
-    // Skip caching for external scripts
-    if (event.request.url.startsWith('http')) {
-        event.respondWith(fetch(event.request));
-        return;
-    }
-
     event.respondWith(
         fetch(event.request)
             .then(networkResponse => {
                 // If fetch is successful, cache it and return it
                 return caches.open(CACHE_NAME).then(cache => {
+                    // Don't cache non-GET requests
+                    if (event.request.method !== 'GET') {
+                        return networkResponse;
+                    }
                     cache.put(event.request, networkResponse.clone());
                     return networkResponse;
                 });
             })
             .catch(() => {
                 // If network fails (offline), get from cache
-                return caches.match(event.request);
+                return caches.match(event.request).then(cachedResponse => {
+                    // Return cached response or a simple offline fallback
+                    return cachedResponse || new Response("You are offline. Some assets may not be available.", { status: 404 });
+                });
             })
     );
 });
+
 
 // --- MESSAGE: Receive alarm data from the app ---
 self.addEventListener('message', event => {
