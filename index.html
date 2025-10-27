@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Alarm</title>
+    <title>Smart 2 Alarm</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Tone.js for audio synthesis -->
@@ -287,6 +287,7 @@
             // --- DOM ELEMENTS ---
             const groupListContainer = document.getElementById('group-list-container');
             const permissionBtn = document.getElementById('permission-btn');
+            const settingsBtn = document.getElementById('settings-btn'); // Get settings button
             const modal = document.getElementById('form-modal');
             const modalTitle = document.getElementById('modal-title');
             const modalBody = document.getElementById('modal-body');
@@ -308,7 +309,7 @@
                 renderAll();
                 attachGlobalListeners();
                 
-                // *** FIX ***: Send alarms to SW on initial load
+                // Send alarms to SW on initial load
                 sendAlarmsToServiceWorker();
             }
 
@@ -368,6 +369,8 @@
                 } else {
                     // This can happen on first load or if SW is not active
                     console.log('Service Worker not yet ready, alarms will be sent when it becomes active.');
+                    // Retry after a short delay
+                    setTimeout(sendAlarmsToServiceWorker, 1000);
                 }
             }
 
@@ -650,6 +653,7 @@
                 openModal('Batch Add Alarms', formHtml);
             }
 
+            // --- Show Alarms in Group ---
             function showGroupAlarms(groupId) {
                 const group = appState.groups.find(g => g.id === groupId);
                 if (!group) return;
@@ -702,6 +706,21 @@
                     addGroupBtn.addEventListener('click', () => showGroupForm());
                     addAlarmBtn.addEventListener('click', () => showAlarmForm(null, currentGroupId));
                     batchAddBtn.addEventListener('click', () => showBatchForm());
+                    
+                    // *** FIX ***: Added listener for settings button
+                    settingsBtn.addEventListener('click', () => {
+                        const settingsHtml = `
+                            <p class="text-gray-700">Settings are not yet implemented.</p>
+                            <p class="text-gray-500 text-sm mt-2">Future options could include:</p>
+                            <ul class="list-disc list-inside text-gray-500 text-sm mt-1">
+                                <li>Default alarm sound</li>
+                                <li>Snooze duration</li>
+                                <li>Theme (Light/Dark)</li>
+                                <li>Archive groups</li>
+                            </ul>
+                        `;
+                        openModal('Settings', settingsHtml);
+                    });
 
                     document.getElementById('stop-alarm-btn').addEventListener('click', stopRinging);
 
@@ -943,7 +962,8 @@
                 const group = appState.groups.find(g => g.id === groupId);
                 if (!group || !start || !end || !interval) return;
 
-                // *** FIX ***: Removed destructuring for wider browser support
+                // *** THE CRITICAL FIX ***
+                // Replaced array destructuring with standard variable assignment for broader browser support.
                 const startParts = start.split(':').map(Number);
                 let startHour = startParts[0];
                 let startMin = startParts[1];
@@ -951,6 +971,7 @@
                 const endParts = end.split(':').map(Number);
                 const endHour = endParts[0];
                 const endMin = endParts[1];
+                // *** END OF FIX ***
 
                 const endTimeInMinutes = endHour * 60 + endMin;
                 let currentTimeInMinutes = startHour * 60 + startMin;
