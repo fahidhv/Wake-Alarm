@@ -119,7 +119,6 @@
             <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
             <path d="M6 12v5c3.33 1 6.67 1 10 0v-5"></path>
         </symbol>
-        <!-- NEW DUMBBELL ICON -->
         <symbol id="icon-dumbbell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M6.5 6.5a4.5 4.5 0 1 1-4 4"></path>
             <path d="M21.5 6.5a4.5 4.5 0 1 1-4 4"></path>
@@ -152,7 +151,6 @@
             <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
             <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
         </symbol>
-        <!-- NEW GAME CONTROLLER ICON -->
         <symbol id="icon-game" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M19.11 10.64s.27-.18.54-.42c.81-.73.81-1.89 0-2.61a1.83 1.83 0 0 0-2.6 0l-.41.36"></path>
             <path d="M10.26 19.58s.18.27.42.54c.73.81 1.89.81 2.61 0a1.83 1.83 0 0 0 0-2.6l-.36-.41"></path>
@@ -169,7 +167,6 @@
             <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"></path>
             <path d="m8.5 8.5 7 7"></path>
         </symbol>
-        <!-- NEW DOG ICON -->
         <symbol id="icon-dog" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M10 5.2a2 2 0 0 1 2-2h.4a2 2 0 0 1 2 2v.6c0 .5-.2 1.1-.7 1.3l-2.1.8c-.5.2-1.1.2-1.6 0l-2.1-.8c-.4-.2-.7-.7-.7-1.3Z"></path>
             <path d="M5 14v-4.7a2 2 0 0 1 1-1.7l6-3.4a2 2 0 0 1 2 0l6 3.4a2 2 0 0 1 1 1.7V14"></path>
@@ -246,7 +243,7 @@
     <!-- Alarm Ringing Modal -->
     <div id="ringing-modal" class="modal fixed inset-0 bg-white flex flex-col items-center justify-center p-8 hidden z-[100]">
         <div class="text-center">
-            <p id="ringing-label" class="text-3xl font-bold text-gray-900 mb-4">Alarm Label</ReadMe>
+            <p id="ringing-label" class="text-3xl font-bold text-gray-900 mb-4">Alarm Label</p>
             <p id="ringing-time" class="text-8xl font-thin text-blue-600 mb-12">00:00</p>
         </div>
         <button id="stop-alarm-btn" class="bg-red-600 hover:bg-red-700 text-white w-full max-w-xs py-6 rounded-lg text-3xl font-bold shadow-lg">
@@ -284,8 +281,8 @@
             let currentRingtoneLoop = null;
             let alarmCheckInterval = null;
             let currentStopTimeout = null;
-            let currentView = 'groups'; // NEW: Track current view
-            let currentGroupId = null; // NEW: Track viewed group
+            let currentView = 'groups'; // Track current view
+            let currentGroupId = null; // Track viewed group
 
             // --- DOM ELEMENTS ---
             const groupListContainer = document.getElementById('group-list-container');
@@ -305,8 +302,8 @@
                 checkNotificationPermission();
                 
                 if (alarmCheckInterval) clearInterval(alarmCheckInterval);
-                alarmCheckInterval = setInterval(checkAlarms, 10000); 
-                checkAlarms(); 
+                alarmCheckInterval = setInterval(checkAlarms, 10000); // Check every 10 seconds
+                checkAlarms(); // Check immediately on load
 
                 renderAll();
                 attachGlobalListeners();
@@ -319,7 +316,27 @@
                         navigator.serviceWorker.register('./service-worker.js')
                             .then(reg => {
                                 console.log('Service Worker registered.', reg);
-                                sendAlarmsToServiceWorker();
+                                // Send alarms on first load *after* registration
+                                // Wait for the worker to be active
+                                if (reg.active) {
+                                    reg.active.postMessage({
+                                        type: 'UPDATE_ALARMS',
+                                        alarms: appState.groups
+                                    });
+                                } else {
+                                    // If not active, wait for it
+                                    reg.addEventListener('updatefound', () => {
+                                        const newWorker = reg.installing;
+                                        newWorker.addEventListener('statechange', () => {
+                                            if (newWorker.state === 'activated' && navigator.serviceWorker.controller) {
+                                                navigator.serviceWorker.controller.postMessage({
+                                                    type: 'UPDATE_ALARMS',
+                                                    alarms: appState.groups
+                                                });
+                                            }
+                                        });
+                                    });
+                                }
                             })
                             .catch(err => console.error('Service Worker registration failed:', err));
                     });
@@ -351,9 +368,9 @@
             }
 
             function sendAlarmsToServiceWorker() {
-                if (navigator.serviceWorker.controller) {
+                if (navigator.serviceWorker && navigator.serviceWorker.controller) {
                     navigator.serviceWorker.controller.postMessage({
-                        type: 'UPDATE_ALARMS',
+                        type: 'UPDATE_ALARMS', // Fixed typo: 'UPDATE_ alarms' to 'UPDATE_ALARMS'
                         alarms: appState.groups
                     });
                 } else {
@@ -363,8 +380,21 @@
 
             // --- STATE MANAGEMENT ---
             function loadState() {
-                const state = localStorage.getItem(STORAGE_KEY);
-                return state ? JSON.parse(state) : JSON.parse(JSON.stringify(DEFAULT_STATE)); // Deep copy
+                try {
+                    const state = localStorage.getItem(STORAGE_KEY);
+                    // Check if state is valid JSON
+                    if (state) {
+                        const parsed = JSON.parse(state);
+                        // Ensure it has the groups property
+                        if (parsed && parsed.groups) {
+                            return parsed;
+                        }
+                    }
+                } catch (e) {
+                    console.error("Failed to load or parse state, reverting to default.", e);
+                }
+                // Return a deep copy of the default state if anything fails
+                return JSON.parse(JSON.stringify(DEFAULT_STATE));
             }
 
             function saveState() {
@@ -394,8 +424,10 @@
 
                 appState.groups.forEach(group => {
                     const groupEl = document.createElement('div');
-                    const ringtoneName = RINGTONES.find(r => r.id === group.ringtone)?.name || 'Default';
-                    const alarmCount = group.alarms.length;
+                    // FIX: Replaced ?. with safe logical AND
+                    const ringtone = RINGTONES.find(r => r.id === group.ringtone);
+                    const ringtoneName = (ringtone && ringtone.name) ? ringtone.name : 'Default';
+                    const alarmCount = (group.alarms && group.alarms.length) ? group.alarms.length : 0;
                     const groupIcon = group.icon ? `#${group.icon}` : '#icon-settings';
 
                     groupEl.className = `bg-white rounded-xl shadow-sm p-4 transition-all ${group.isEnabled ? '' : 'opacity-60'}`;
@@ -442,8 +474,8 @@
             }
 
             function getDaysString(days) {
+                if (!days || days.length === 0) return 'Once';
                 if (days.length === 7) return 'Every day';
-                if (days.length === 0) return 'Once';
                 if (days.length === 2 && days.includes('Sat') && days.includes('Sun')) return 'Weekends';
                 if (days.length === 5 && !days.includes('Sat') && !days.includes('Sun')) return 'Weekdays';
                 return days.join(', ');
@@ -485,7 +517,7 @@
             function showGroupForm(group = null) {
                 currentView = 'form';
                 const isEditing = !!group;
-                const selectedIcon = group?.icon || 'icon-home'; // Default to home icon
+                const selectedIcon = (group && group.icon) ? group.icon : 'icon-home'; // Default to home icon
 
                 const ICONS = [
                     'icon-home', 'icon-work', 'icon-graduation-cap', 'icon-dumbbell', 'icon-moon', 'icon-sun',
@@ -500,12 +532,12 @@
 
                 const formHtml = `
                     <form id="group-form" class="space-y-4">
-                        <input type="hidden" name="id" value="${group?.id || ''}">
+                        <input type="hidden" name="id" value="${(group && group.id) ? group.id : ''}">
                         <input type="hidden" id="group-icon-input" name="icon" value="${selectedIcon}">
                         
                         <div>
                             <label for="group-name" class="block text-sm font-medium text-gray-700 mb-1">Group Name</label>
-                            <input type="text" id="group-name" name="name" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-gray-900" value="${group?.name || ''}" placeholder="e.g., Morning Routine" required>
+                            <input type="text" id="group-name" name="name" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-gray-900" value="${(group && group.name) ? group.name : ''}" placeholder="e.g., Morning Routine" required>
                         </div>
 
                         <div>
@@ -518,7 +550,7 @@
                         <div>
                             <label for="group-ringtone" class="block text-sm font-medium text-gray-700 mb-1">Default Ringtone</label>
                             <select id="group-ringtone" name="ringtone" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-gray-900">
-                                ${createRingtoneSelect(group?.ringtone || 'Digital')}
+                                ${createRingtoneSelect((group && group.ringtone) ? group.ringtone : 'Digital')}
                             </select>
                         </div>
                         
@@ -541,11 +573,11 @@
                 currentView = 'form';
                 const isEditing = !!alarm;
                 // If adding new, use current group (if any) or first group
-                const alarmGroupId = groupId || currentGroupId || appState.groups[0]?.id || '';
+                const alarmGroupId = (alarm && alarm.groupId) ? alarm.groupId : (groupId || currentGroupId || (appState.groups[0] && appState.groups[0].id) || '');
 
                 const formHtml = `
                     <form id="alarm-form" class="space-y-4">
-                        <input type="hidden" name="id" value="${alarm?.id || ''}">
+                        <input type="hidden" name="id" value="${(alarm && alarm.id) ? alarm.id : ''}">
                         <input type="hidden" name="originalGroupId" value="${alarmGroupId}">
                         <div>
                             <label for="alarm-group" class="block text-sm font-medium text-gray-700 mb-1">Group</label>
@@ -555,33 +587,33 @@
                         </div>
                         <div>
                             <label for="alarm-time" class="block text-sm font-medium text-gray-700 mb-1">Time</label>
-                            <input type="time" id="alarm-time" name="time" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-gray-900" value="${alarm?.time || '07:00'}" required>
+                            <input type="time" id="alarm-time" name="time" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-gray-900" value="${(alarm && alarm.time) ? alarm.time : '07:00'}" required>
                         </div>
                         <div>
                             <label for="alarm-label" class="block text-sm font-medium text-gray-700 mb-1">Label</label>
-                            <input type="text" id="alarm-label" name="label" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-gray-900" value="${alarm?.label || ''}" placeholder="e.g., Wake up">
+                            <input type="text" id="alarm-label" name="label" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-gray-900" value="${(alarm && alarm.label) ? alarm.label : ''}" placeholder="e.g., Wake up">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Repeat</label>
                             <div class="flex justify-around">
-                                ${createDayToggles(alarm?.days)}
+                                ${createDayToggles(alarm && alarm.days)}
                             </div>
                         </div>
                         <div>
                             <label for="alarm-ringtone" class="block text-sm font-medium text-gray-700 mb-1">Ringtone (Overrides group)</label>
                             <select id="alarm-ringtone" name="ringtone" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-gray-900">
                                 <option value="">Use Group Default</option>
-                                ${createRingtoneSelect(alarm?.ringtone)}
+                                ${createRingtoneSelect(alarm && alarm.ringtone)}
                             </select>
                         </div>
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label for="alarm-duration" class="block text-sm font-medium text-gray-700 mb-1">Ring Duration (seconds)</label>
-                                <input type="number" id="alarm-duration" name="duration" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-gray-900" value="${alarm?.duration || 60}" placeholder="60">
+                                <input type="number" id="alarm-duration" name="duration" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-gray-900" value="${(alarm && alarm.duration) ? alarm.duration : 60}" placeholder="60">
                             </div>
                             <div>
                                 <label for="alarm-color" class="block text-sm font-medium text-gray-700 mb-1">Color</label>
-                                <input type="color" id="alarm-color" name="color" class="w-full h-10 bg-gray-100 border border-gray-300 rounded-lg" value="${alarm?.color || '#1f2937'}">
+                                <input type="color" id="alarm-color" name="color" class="w-full h-10 bg-gray-100 border border-gray-300 rounded-lg" value="${(alarm && alarm.color) ? alarm.color : '#1f2937'}">
                             </div>
                         </div>
                         <div class="flex justify-between items-center pt-2">
@@ -635,7 +667,7 @@
                 openModal('Batch Add Alarms', formHtml);
             }
 
-            // --- NEW: Show Alarms in Group ---
+            // --- Show Alarms in Group ---
             function showGroupAlarms(groupId) {
                 const group = appState.groups.find(g => g.id === groupId);
                 if (!group) return;
@@ -644,7 +676,7 @@
                 currentGroupId = groupId;
 
                 let alarmHtml = '';
-                if (group.alarms.length === 0) {
+                if (!group.alarms || group.alarms.length === 0) {
                     alarmHtml = '<p class="text-gray-500 text-center py-4">No alarms in this group.</p>';
                 } else {
                     // Sort alarms by time
@@ -682,158 +714,186 @@
 
             // --- EVENT HANDLERS ---
             function attachGlobalListeners() {
-                permissionBtn.addEventListener('click', requestNotificationPermission);
-                modalCloseBtn.addEventListener('click', closeModal);
-                
-                addGroupBtn.addEventListener('click', () => showGroupForm());
-                addAlarmBtn.addEventListener('click', () => showAlarmForm(null, currentGroupId)); // Pass current group
-                batchAddBtn.addEventListener('click', () => showBatchForm());
-
-                document.getElementById('stop-alarm-btn').addEventListener('click', stopRinging);
-
-                // Event delegation for dynamic content
-                groupListContainer.addEventListener('click', e => {
-                    // Handle Group Toggle
-                    const groupBtn = e.target.closest('.toggle-group-btn');
-                    if (groupBtn) {
-                        const groupId = groupBtn.dataset.groupId;
-                        const group = appState.groups.find(g => g.id === groupId);
-                        group.isEnabled = groupBtn.checked;
-                        saveState();
-                        return; // Stop event from bubbling to card click
-                    }
-
-                    // Handle Group Edit
-                    const editGroupBtn = e.target.closest('.edit-group-btn');
-                    if (editGroupBtn) {
-                        const group = appState.groups.find(g => g.id === editGroupBtn.dataset.groupId);
-                        showGroupForm(group);
-                        return; // Stop event from bubbling
-                    }
+                try {
+                    permissionBtn.addEventListener('click', requestNotificationPermission);
+                    modalCloseBtn.addEventListener('click', closeModal);
                     
-                    // NEW: Handle Group Card Click to open alarm list
-                    const groupCard = e.target.closest('.group-card-clickable');
-                    if (groupCard) {
-                        showGroupAlarms(groupCard.dataset.groupId);
-                    }
-                });
+                    addGroupBtn.addEventListener('click', () => showGroupForm());
+                    addAlarmBtn.addEventListener('click', () => showAlarmForm(null, currentGroupId)); // Pass current group
+                    batchAddBtn.addEventListener('click', () => showBatchForm());
 
-                // Modal form submissions
-                modalBody.addEventListener('submit', e => {
-                    e.preventDefault();
-                    if (e.target.id === 'group-form') handleGroupSave(e.target);
-                    if (e.target.id === 'alarm-form') handleAlarmSave(e.target);
-                    if (e.target.id === 'batch-form') handleBatchSave(e.target);
-                });
+                    document.getElementById('stop-alarm-btn').addEventListener('click', stopRinging);
 
-                // Modal action buttons (delegated)
-                modalBody.addEventListener('click', e => {
-                    // --- Confirmation Modal Logic ---
-                    const showConfirm = (message, onConfirm) => {
-                        const confirmHtml = `
-                            <p class="text-gray-700 mb-4">${message}</p>
-                            <div class="flex justify-end space-x-2">
-                                <button id="confirm-cancel" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg">Cancel</button>
-                                <button id="confirm-ok" class="bg-red-600 text-white px-4 py-2 rounded-lg">Delete</button>
-                            </div>
-                        `;
-                        openModal('Are you sure?', confirmHtml);
-                        document.getElementById('confirm-ok').onclick = () => {
-                            onConfirm();
-                        };
-                        document.getElementById('confirm-cancel').onclick = () => {
-                            // Re-open the previous form/view
-                            if (window.lastOpenView) window.lastOpenView();
-                            else closeModal();
-                        };
-                    };
-
-                    // --- Button Handlers ---
-                    
-                    // Group Form: Cancel
-                    if (e.target.id === 'form-cancel-btn') {
-                        closeModal();
-                    }
-
-                    // Group Form: Delete
-                    if (e.target.id === 'delete-group-btn') {
-                        const form = e.target.closest('form');
-                        const groupId = form.elements.id.value;
-                        window.lastOpenView = () => showGroupForm(appState.groups.find(g => g.id === groupId));
-                        
-                        showConfirm('Are you sure you want to delete this group and all its alarms?', () => {
-                            appState.groups = appState.groups.filter(g => g.id !== groupId);
-                            saveState();
-                            closeModal(); 
-                        });
-                    }
-
-                    // Alarm Form: Delete
-                    if (e.target.id === 'delete-alarm-btn') {
-                        const form = e.target.closest('form');
-                        const alarmId = form.elements.id.value;
-                        const groupId = form.elements.originalGroupId.value;
-                        window.lastOpenView = () => showAlarmForm(appState.groups.find(g => g.id === groupId)?.alarms.find(a => a.id === alarmId), groupId);
-                        
-                        showConfirm('Are you sure you want to delete this alarm?', () => {
+                    // Event delegation for dynamic content
+                    groupListContainer.addEventListener('click', e => {
+                        // Handle Group Toggle
+                        const groupBtn = e.target.closest('.toggle-group-btn');
+                        if (groupBtn) {
+                            const groupId = groupBtn.dataset.groupId;
                             const group = appState.groups.find(g => g.id === groupId);
                             if (group) {
-                                group.alarms = group.alarms.filter(a => a.id !== alarmId);
+                                group.isEnabled = groupBtn.checked;
+                                saveState();
                             }
-                            // Go back to alarm list after deleting
-                            const lastGroupId = currentGroupId; // Store before closing
+                            return; // Stop event from bubbling to card click
+                        }
+
+                        // Handle Group Edit
+                        const editGroupBtn = e.target.closest('.edit-group-btn');
+                        if (editGroupBtn) {
+                            const group = appState.groups.find(g => g.id === editGroupBtn.dataset.groupId);
+                            if (group) {
+                                showGroupForm(group);
+                            }
+                            return; // Stop event from bubbling
+                        }
+                        
+                        // Handle Group Card Click to open alarm list
+                        const groupCard = e.target.closest('.group-card-clickable');
+                        if (groupCard) {
+                            showGroupAlarms(groupCard.dataset.groupId);
+                        }
+                    });
+
+                    // Modal form submissions
+                    modalBody.addEventListener('submit', e => {
+                        e.preventDefault();
+                        if (e.target.id === 'group-form') handleGroupSave(e.target);
+                        if (e.target.id === 'alarm-form') handleAlarmSave(e.target);
+                        if (e.target.id === 'batch-form') handleBatchSave(e.target);
+                    });
+
+                    // Modal action buttons (delegated)
+                    modalBody.addEventListener('click', e => {
+                        // --- Confirmation Modal Logic ---
+                        const showConfirm = (message, onConfirm) => {
+                            const confirmHtml = `
+                                <p class="text-gray-700 mb-4">${message}</p>
+                                <div class="flex justify-end space-x-2">
+                                    <button id="confirm-cancel" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg">Cancel</button>
+                                    <button id="confirm-ok" class="bg-red-600 text-white px-4 py-2 rounded-lg">Delete</button>
+                                </div>
+                            `;
+                            openModal('Are you sure?', confirmHtml);
+                            
+                            const confirmOkBtn = document.getElementById('confirm-ok');
+                            if (confirmOkBtn) {
+                                confirmOkBtn.onclick = onConfirm;
+                            }
+                            
+                            const confirmCancelBtn = document.getElementById('confirm-cancel');
+                            if (confirmCancelBtn) {
+                                confirmCancelBtn.onclick = () => {
+                                    // Re-open the previous form/view
+                                    if (window.lastOpenView) window.lastOpenView();
+                                    else closeModal();
+                                };
+                            }
+                        };
+
+                        // --- Button Handlers ---
+                        
+                        // Group Form: Cancel
+                        if (e.target.id === 'form-cancel-btn') {
                             closeModal();
-                            if (lastGroupId) showGroupAlarms(lastGroupId);
-                            else saveState(); // Just save if we're somehow lost
-                        });
-                    }
-                    
-                    // NEW: Alarm List: Back Button
-                    if (e.target.id === 'modal-back-btn') {
-                        closeModal(); // This resets view to 'groups'
-                        renderGroups();
-                    }
-
-                    // NEW: Alarm List: Toggle Alarm
-                    const alarmToggle = e.target.closest('.toggle-alarm-btn');
-                    if (alarmToggle) {
-                        const alarmId = alarmToggle.dataset.alarmId;
-                        const groupId = alarmToggle.dataset.groupId;
-                        const group = appState.groups.find(g => g.id === groupId);
-                        const alarm = group?.alarms.find(a => a.id === alarmId);
-                        if (alarm) {
-                            alarm.isEnabled = alarmToggle.checked;
-                            saveState(); // This will re-render the alarm list
                         }
-                    }
 
-                    // NEW: Alarm List: Edit Alarm
-                    const alarmItem = e.target.closest('.alarm-item-clickable');
-                    if (alarmItem && !e.target.closest('.toggle-alarm-btn')) {
-                        const alarmId = alarmItem.dataset.alarmId;
-                        const group = appState.groups.find(g => g.id === currentGroupId);
-                        const alarm = group?.alarms.find(a => a.id === alarmId);
-                        if (alarm) {
-                            showAlarmForm(alarm, group.id);
+                        // Group Form: Delete
+                        if (e.target.id === 'delete-group-btn') {
+                            const form = e.target.closest('form');
+                            const groupId = form.elements.id.value;
+                            const groupToDelete = appState.groups.find(g => g.id === groupId);
+                            
+                            if (groupToDelete) {
+                                window.lastOpenView = () => showGroupForm(groupToDelete);
+                                showConfirm('Are you sure you want to delete this group and all its alarms?', () => {
+                                    appState.groups = appState.groups.filter(g => g.id !== groupId);
+                                    saveState();
+                                    closeModal(); 
+                                });
+                            }
                         }
-                    }
 
-                    // --- Icon Grid Selection ---
-                    const iconBtn = e.target.closest('.icon-select-btn');
-                    if (iconBtn) {
-                        const iconGrid = iconBtn.closest('#icon-grid');
-                        // Update hidden input
-                        document.getElementById('group-icon-input').value = iconBtn.dataset.icon;
+                        // Alarm Form: Delete
+                        if (e.target.id === 'delete-alarm-btn') {
+                            const form = e.target.closest('form');
+                            const alarmId = form.elements.id.value;
+                            const groupId = form.elements.originalGroupId.value;
+                            const group = appState.groups.find(g => g.id === groupId);
+                            const alarmToDelete = group ? group.alarms.find(a => a.id === alarmId) : null;
 
-                        // Update visual selection
-                        iconGrid.querySelectorAll('.icon-select-btn').forEach(b => {
-                            b.classList.remove('bg-blue-100', 'border-blue-600', 'text-blue-600');
-                            b.classList.add('border-gray-200', 'bg-white', 'text-gray-500', 'hover:bg-gray-50');
-                        });
-                        iconBtn.classList.add('bg-blue-100', 'border-blue-600', 'text-blue-600');
-                        iconBtn.classList.remove('border-gray-200', 'bg-white', 'text-gray-500', 'hover:bg-gray-50');
+                            if (alarmToDelete) {
+                                window.lastOpenView = () => showAlarmForm(alarmToDelete, groupId);
+                                showConfirm('Are you sure you want to delete this alarm?', () => {
+                                    if (group) {
+                                        group.alarms = group.alarms.filter(a => a.id !== alarmId);
+                                    }
+                                    const lastGroupId = currentGroupId; // Store before closing
+                                    closeModal();
+                                    if (lastGroupId) showGroupAlarms(lastGroupId);
+                                    else saveState(); // Just save if we're somehow lost
+                                });
+                            }
+                        }
+                        
+                        // Alarm List: Back Button
+                        if (e.target.id === 'modal-back-btn' || e.target.closest('#modal-back-btn')) {
+                            closeModal(); // This resets view to 'groups'
+                            renderGroups();
+                        }
+
+                        // Alarm List: Toggle Alarm
+                        const alarmToggle = e.target.closest('.toggle-alarm-btn');
+                        if (alarmToggle) {
+                            const alarmId = alarmToggle.dataset.alarmId;
+                            const groupId = alarmToggle.dataset.groupId;
+                            const group = appState.groups.find(g => g.id === groupId);
+                            const alarm = group ? group.alarms.find(a => a.id === alarmId) : null;
+                            if (alarm) {
+                                alarm.isEnabled = alarmToggle.checked;
+                                saveState(); // This will re-render the alarm list
+                            }
+                        }
+
+                        // Alarm List: Edit Alarm
+                        const alarmItem = e.target.closest('.alarm-item-clickable');
+                        if (alarmItem && !e.target.closest('.toggle-alarm-btn')) {
+                            const alarmId = alarmItem.dataset.alarmId;
+                            const group = appState.groups.find(g => g.id === currentGroupId);
+                            const alarm = group ? group.alarms.find(a => a.id === alarmId) : null;
+                            if (alarm) {
+                                showAlarmForm(alarm, group.id);
+                            }
+                        }
+
+                        // --- Icon Grid Selection ---
+                        const iconBtn = e.target.closest('.icon-select-btn');
+                        if (iconBtn) {
+                            const iconGrid = iconBtn.closest('#icon-grid');
+                            const iconInput = document.getElementById('group-icon-input');
+                            
+                            if (iconGrid && iconInput) {
+                                // Update hidden input
+                                iconInput.value = iconBtn.dataset.icon;
+
+                                // Update visual selection
+                                iconGrid.querySelectorAll('.icon-select-btn').forEach(b => {
+                                    b.classList.remove('bg-blue-100', 'border-blue-600', 'text-blue-600');
+                                    b.classList.add('border-gray-200', 'bg-white', 'text-gray-500', 'hover:bg-gray-50');
+                                });
+                                iconBtn.classList.add('bg-blue-100', 'border-blue-600', 'text-blue-600');
+                                iconBtn.classList.remove('border-gray-200', 'bg-white', 'text-gray-500', 'hover:bg-gray-50');
+                            }
+                        }
+                    });
+                } catch (e) {
+                    console.error("Error attaching global listeners:", e);
+                    // This is critical - if listeners fail, the app is dead.
+                    const appEl = document.getElementById('app-container');
+                    if (appEl) {
+                        appEl.innerHTML = '<p class="text-red-500 p-4 font-bold text-lg text-center">A critical error occurred. Please clear your site data in your browser settings and try again.</p>' + appEl.innerHTML;
                     }
-                });
+                }
             }
 
             // --- CRUD & FORM LOGIC ---
@@ -851,7 +911,7 @@
 
                 const existingIndex = appState.groups.findIndex(g => g.id === id);
                 if (existingIndex > -1) {
-                    group.alarms = appState.groups[existingIndex].alarms; // Preserve alarms
+                    group.alarms = appState.groups[existingIndex].alarms || []; // Preserve alarms
                     group.isEnabled = appState.groups[existingIndex].isEnabled; // Preserve enabled state
                     appState.groups[existingIndex] = group;
                 } else {
@@ -894,6 +954,12 @@
                     closeModal();
                     return;
                 }
+                
+                // Ensure alarms array exists
+                if (!newGroup.alarms) {
+                    newGroup.alarms = [];
+                }
+
                 const existingIndex = newGroup.alarms.findIndex(a => a.id === id);
                 
                 if (existingIndex > -1) {
@@ -940,6 +1006,8 @@
                         duration: 60,
                         color: '#1f2937'
                     };
+                    
+                    if (!group.alarms) group.alarms = [];
                     group.alarms.push(alarm);
                     
                     currentTimeInMinutes += interval;
@@ -952,7 +1020,6 @@
             }
 
             // --- ALARM LOGIC ---
-
             function checkAlarms() {
                 if (currentRingingAlarm) return; // An alarm is already ringing
 
@@ -961,20 +1028,23 @@
                 const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
                 for (const group of appState.groups) {
-                    if (!group.isEnabled) continue;
+                    if (!group.isEnabled || !group.alarms) continue;
                     for (const alarm of group.alarms) {
                         if (!alarm.isEnabled || alarm.time !== currentTime) continue;
                         
                         // Check if this specific alarm has already been rung this minute
-                        if (alarm.id === window.lastRungAlarmId && (now.getTime() - window.lastRungAlarmTime < 50000)) {
+                        // Use a simple global object for this check
+                        if (!window.lastRungTimes) window.lastRungTimes = {};
+                        const lastRungTime = window.lastRungTimes[alarm.id] || 0;
+                        
+                        if (now.getTime() - lastRungTime < 50000) {
                             continue; // Already rung this alarm in the last 50s
                         }
 
-                        const isToday = alarm.days.length === 0 || alarm.days.includes(currentDay);
+                        const isToday = (alarm.days && alarm.days.length === 0) || (alarm.days && alarm.days.includes(currentDay));
                         
                         if (isToday) {
-                            window.lastRungAlarmId = alarm.id;
-                            window.lastRungAlarmTime = now.getTime();
+                            window.lastRungTimes[alarm.id] = now.getTime();
                             
                             if (alarm.days.length === 0) {
                                 // One-time alarm
@@ -994,10 +1064,13 @@
 
             function startRinging(alarm, group) {
                 if (currentRingingAlarm) return;
-                Tone.start();
+                
+                // Request audio context on user interaction (this is a fallback)
+                Tone.start().catch(e => console.error("Tone.start() failed:", e));
+                
                 currentRingingAlarm = alarm;
                 
-                document.getElementById('ringing-label').textContent = alarm.label;
+                document.getElementById('ringing-label').textContent = alarm.label || 'Alarm!';
                 document.getElementById('ringing-time').textContent = alarm.time;
                 ringingModal.classList.remove('hidden');
 
@@ -1005,11 +1078,18 @@
                 const ringtone = RINGTONES.find(r => r.id === ringtoneName);
                 
                 const synth = new Tone.Synth().toDestination();
-                currentRingtoneLoop = new Tone.Loop(time => {
-                    ringtone.play(synth);
-                }, "1s").start(0);
                 
-                Tone.Transport.start();
+                if (ringtone && ringtone.id !== 'None') {
+                    currentRingtoneLoop = new Tone.Loop(time => {
+                        try {
+                            ringtone.play(synth);
+                        } catch (e) {
+                            console.error("Error playing ringtone:", e);
+                            stopRinging(); // Stop if synth fails
+                        }
+                    }, "1.5s").start(0); // Changed to 1.5s for a less frantic loop
+                    Tone.Transport.start();
+                }
 
                 const duration = alarm.duration || 60;
                 if (currentStopTimeout) clearTimeout(currentStopTimeout);
@@ -1022,7 +1102,11 @@
                     currentRingtoneLoop.dispose();
                     currentRingtoneLoop = null;
                 }
-                Tone.Transport.stop();
+                
+                // Check if Transport is running before trying to stop it
+                if (Tone.Transport.state === "started") {
+                    Tone.Transport.stop();
+                }
                 
                 if (currentStopTimeout) {
                     clearTimeout(currentStopTimeout);
